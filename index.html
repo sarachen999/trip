@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>旅遊小助手</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 基礎字體與防誤觸設定 */
+* {
+font-family: 'Inter', 'Noto Sans TC', sans-serif;
+-webkit-tap-highlight-color: transparent;
+box-sizing: border-box;
+}
+
+body {
+margin: 0;
+min-height: 100vh;
+/* 藍綠色系柔光漸層背景 */
+background: linear-gradient(135deg, #e0f7fa 0%, #e0f2f1 35%, #b2ebf2 70%, #e8f5e9 100%);
+background-attachment: fixed;
+color: #0f292e;
+overflow-x: hidden;
+}
+
+/* 背景漂浮光暈，強化 Glassmorphism 層次 */
+.ambient-orb-1 {
+position: fixed;
+top: -10%;
+left: -15%;
+width: 75vw;
+height: 75vw;
+border-radius: 50%;
+background: radial-gradient(circle, rgba(20, 184, 166, 0.28) 0%, rgba(255, 255, 255, 0) 70%);
+filter: blur(40px);
+z-index: 0;
+pointer-events: none;
+}
+
+.ambient-orb-2 {
+position: fixed;
+bottom: 5%;
+right: -15%;
+width: 85vw;
+height: 85vw;
+border-radius: 50%;
+background: radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(167, 243, 208, 0.1) 50%, rgba(255, 255, 255, 0) 70%);
+filter: blur(50px);
+z-index: 0;
+pointer-events: none;
+}
+
+/* 毛玻璃核心樣式 */
+.glass-card {
+background: rgba(255, 255, 255, 0.58);
+backdrop-filter: blur(18px);
+-webkit-backdrop-filter: blur(18px);
+border: 1px solid rgba(255, 255, 255, 0.85);
+box-shadow: 0 10px 30px -5px rgba(13, 148, 136, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+}
+
+.glass-pill {
+background: rgba(255, 255, 255, 0.65);
+backdrop-filter: blur(12px);
+-webkit-backdrop-filter: blur(12px);
+border: 1px solid rgba(255, 255, 255, 0.9);
+box-shadow: 0 4px 15px rgba(15, 118, 110, 0.06);
+}
+
+/* 虹彩微光強調邊框/按鈕 (Iridescent accents) */
+.iridescent-active {
+background: linear-gradient(135deg, rgba(13, 148, 136, 0.92) 0%, rgba(2, 132, 199, 0.88) 50%, rgba(45, 212, 191, 0.92) 100%);
+color: #ffffff;
+border: 1px solid rgba(255, 255, 255, 0.6);
+box-shadow: 0 6px 20px rgba(13, 148, 136, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+}
+
+.iridescent-border {
+position: relative;
+}
+.iridescent-border::before {
+content: "";
+position: absolute;
+inset: 0;
+border-radius: inherit;
+padding: 1.5px;
+background: linear-gradient(120deg, rgba(45,212,191,0.7), rgba(186,230,253,0.9), rgba(167,243,208,0.8), rgba(56,189,248,0.6));
+-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+-webkit-mask-composite: xor;
+mask-composite: exclude;
+pointer-events: none;
+}
+
+/* 隱藏卷軸但保留滑動功能 */
+.no-scrollbar::-webkit-scrollbar {
+display: none;
+}
+.no-scrollbar {
+-ms-overflow-style: none;
+scrollbar-width: none;
+}
+
+/* 勾選動畫 */
+.check-transition {
+transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 編輯狀態提示呼吸燈 */
+@keyframes pulse-border {
+0%, 100% { border-color: rgba(13, 148, 136, 0.4); }
+50% { border-color: rgba(13, 148, 136, 0.95); }
+}
+.editable-highlight {
+animation: pulse-border 2s infinite;
+background: rgba(255, 255, 255, 0.75);
+}
+
+/* 左側專屬拖曳把手與浮起排序動畫 */
+.drag-handle {
+touch-action: none;
+cursor: grab;
+user-select: none;
+-webkit-user-select: none;
+}
+.drag-handle:active {
+cursor: grabbing;
+}
+
+.sortable-item {
+transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.dragging-card {
+position: fixed;
+z-index: 50;
+margin: 0 !important;
+transition: none !important;
+background: rgba(255, 255, 255, 0.96) !important;
+box-shadow: 0 20px 38px -6px rgba(13, 148, 136, 0.28), 0 0 0 2px rgba(20, 184, 166, 0.7) !important;
+pointer-events: none;
+}
+
+/* 方案一：透明虛線佔位框 (Ghost Placeholder) */
+.drag-placeholder {
+border-radius: 1rem;
+border: 2px dashed rgba(20, 184, 166, 0.75);
+background: linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(56, 189, 248, 0.1));
+box-shadow: inset 0 0 14px rgba(20, 184, 166, 0.14);
+transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+pointer-events: none;
+}
+
+/* 隱藏匯率輸入框預設的上下微調小箭頭，避免擠壓小數點數字顯示空間 */
+#exchange-rate-input::-webkit-outer-spin-button,
+#exchange-rate-input::-webkit-inner-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+#exchange-rate-input[type="number"] {
+-moz-appearance: textfield;
+}
+</style>
+</head>
+<body class="antialiased selection:bg-teal-200 selection:text-teal-900 pb-10">
+
+<!-- 背景柔光球 -->
+<div class="ambient-orb-1"></div>
+<div class="ambient-orb-2"></div>
+
+<!-- 主容器 (手機最佳化寬度置中) -->
+<div class="relative z-10 max-w-md mx-auto px-4 pt-5">
+
+<!-- 頂部精簡一鍵回頂部膠囊按鈕 (向下捲動超過導覽列時平滑滑出) -->
+<div id="sticky-mini-bar" class="fixed top-3 left-0 right-0 z-40 px-4 pointer-events-none transition-all duration-300 ease-out -translate-y-4 opacity-0 flex justify-center">
+<button onclick="scrollToTopSmooth()" class="glass-card iridescent-border px-3.5 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold tracking-wider text-teal-800 shadow-lg active:scale-95 transition-transform">
+<svg class="w-3.5 h-3.5 text-teal-600" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"></path>
+</svg>
+<span>TOP</span>
+</button>
+</div>
+
+<!-- 頂部極簡標題與鎖定控制列 -->
+<header class="flex items-center justify-between mb-3.5 gap-2">
+<div id="trip-header-container" class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 text-xs font-semibold tracking-wider text-teal-800 bg-white/70 rounded-full border border-white">2026 • 11/22–26</span>
+<span id="offline-badge" class="w-2 h-2 rounded-full bg-emerald-500" title="離線就緒"></span>
+</div>
+<h1 class="text-2xl font-bold tracking-tight text-slate-800 mt-1 truncate">BUSAN 釜山行</h1>
+</div>
+
+<!-- 右側操作按鈕群：儲存 + 鎖定/解鎖 -->
+<div class="flex items-center gap-1.5 shrink-0">
+<!-- 手動儲存按鈕 -->
+<button onclick="manualSave()" class="glass-pill px-3.5 py-2.5 rounded-full flex items-center gap-1.5 text-sm font-medium text-teal-800 active:scale-95 transition-transform" title="儲存至本機">
+<svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"></path>
+</svg>
+<span>儲存</span>
+</button>
+
+<!-- 鎖定 / 解鎖編輯切換按鈕 -->
+<button id="toggle-lock-btn" onclick="toggleEditLock()" class="glass-pill px-3.5 py-2.5 rounded-full flex items-center gap-1.5 text-sm font-medium text-slate-700 active:scale-95 transition-transform">
+<svg id="lock-icon" class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+</svg>
+<span id="lock-text">已鎖定</span>
+</button>
+</div>
+</header>
+
+<!-- 頂部膠囊分頁切換列 -->
+<nav class="mb-4">
+<div class="glass-card rounded-full p-1.5 grid grid-cols-2 gap-1.5">
+<button id="nav-packing" onclick="switchTab('packing')" class="iridescent-active rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+</svg>
+<span>攜帶清單</span>
+</button>
+<button id="nav-shopping" onclick="switchTab('shopping')" class="rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:bg-white/50 transition-all">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z"></path>
+</svg>
+<span>待買 & 匯率</span>
+</button>
+</div>
+</nav>
+
+<!-- ==================== 分頁一：打包清單 ==================== -->
+<main id="tab-packing" class="space-y-4">
+<!-- 統計儀表板 (全部 / 已勾選 / 尚未打包) -->
+<section class="glass-card iridescent-border rounded-3xl p-4">
+<div class="flex items-center justify-between mb-2.5">
+<span class="text-xs font-semibold uppercase tracking-wider text-teal-800/80">PACKING STATUS</span>
+<span id="progress-percent" class="text-sm font-bold text-teal-700">0%</span>
+</div>
+<!-- 進度條 -->
+<div class="w-full h-2.5 bg-white/60 rounded-full overflow-hidden p-0.5 mb-3.5 border border-white/80">
+<div id="progress-bar" class="h-full rounded-full transition-all duration-500 ease-out" style="width: 0%; background: linear-gradient(90deg, #14b8a6, #0284c7, #34d399);"></div>
+</div>
+
+<!-- 三大數據指標 + 點擊直接篩選 -->
+<div class="grid grid-cols-3 gap-2">
+<button onclick="setFilter('all')" id="stat-all" class="filter-stat-btn rounded-2xl py-2.5 px-2 text-center transition-all bg-white/80 shadow-sm border border-teal-400/50">
+<div id="count-all" class="text-xl font-bold text-slate-800">0</div>
+<div class="text-xs font-medium text-slate-500 mt-0.5">全部清單</div>
+</button>
+<button onclick="setFilter('checked')" id="stat-checked" class="filter-stat-btn rounded-2xl py-2.5 px-2 text-center transition-all bg-white/40 border border-white/60">
+<div id="count-checked" class="text-xl font-bold text-teal-600">0</div>
+<div class="text-xs font-medium text-slate-500 mt-0.5">已勾選</div>
+</button>
+<button onclick="setFilter('unchecked')" id="stat-unchecked" class="filter-stat-btn rounded-2xl py-2.5 px-2 text-center transition-all bg-white/40 border border-white/60">
+<div id="count-unchecked" class="text-xl font-bold text-amber-600">0</div>
+<div class="text-xs font-medium text-slate-500 mt-0.5">尚未打包</div>
+</button>
+</div>
+</section>
+
+<!-- 分類膠囊列 (全部獨立最上方，六大分類 3x2 兩列整齊排列) -->
+<div id="category-pills" class="space-y-2 py-0.5">
+<!-- 由 JS 動態生成 -->
+</div>
+
+<!-- 自訂新增物品列 -->
+<div class="glass-card rounded-full p-1.5 flex items-center gap-1.5">
+<select id="new-item-category" class="bg-white/70 text-slate-700 text-xs font-medium rounded-full px-3 py-2.5 outline-none border border-white/80">
+<option value="證件金融">證件金融</option>
+<option value="衣物配件">衣物配件</option>
+<option value="3C網路">3C網路</option>
+<option value="盥洗保養">盥洗保養</option>
+<option value="美妝隱眼">美妝隱眼</option>
+<option value="臨時藥品">臨時藥品</option>
+<option value="其他用品" selected>其他用品</option>
+</select>
+<input id="new-item-input" type="text" placeholder="新增攜帶物品..." class="flex-1 min-w-0 bg-transparent px-2 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none" onkeypress="if(event.key==='Enter') addPackingItem()">
+<button id="new-item-carryon-btn" type="button" onclick="toggleNewItemCarryOn()" class="px-2.5 py-2 rounded-full bg-white/70 text-slate-500 border border-white/80 text-xs font-semibold shrink-0 active:scale-95 transition-all" title="標記為隨身包">
+隨身
+</button>
+<button onclick="addPackingItem()" class="iridescent-active w-10 h-10 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+</svg>
+</button>
+</div>
+
+<!-- 物品清單列表容器 -->
+<div id="packing-list-container" class="relative space-y-2.5">
+<!-- 由 JS 動態生成卡片 -->
+</div>
+
+</main>
+
+<!-- ==================== 分頁二：待買清單 & 匯率換算 ==================== -->
+<main id="tab-shopping" class="hidden space-y-4">
+<!-- 韓元 ↔ 台幣即時匯率換算器卡片 -->
+<section class="glass-card iridescent-border rounded-3xl p-4">
+<!-- 幣別三選一膠囊列 (韓元 / 日幣 / 泰銖) -->
+<div class="grid grid-cols-3 gap-1.5 bg-white/50 p-1 rounded-full border border-white/80 mb-3">
+<button id="curr-btn-KRW" onclick="selectCurrency('KRW')" class="py-1.5 rounded-full text-xs font-bold transition-all iridescent-active shadow-sm">
+韓元 KRW
+</button>
+<button id="curr-btn-JPY" onclick="selectCurrency('JPY')" class="py-1.5 rounded-full text-xs font-bold transition-all text-slate-600 hover:bg-white/60">
+日幣 JPY
+</button>
+<button id="curr-btn-THB" onclick="selectCurrency('THB')" class="py-1.5 rounded-full text-xs font-bold transition-all text-slate-600 hover:bg-white/60">
+泰銖 THB
+</button>
+</div>
+
+<div class="flex items-center justify-between mb-3">
+<!-- 防誤觸匯率基準 + 確認勾選 + 恢復按鈕 (僅在可編輯狀態下可修改) -->
+<div id="rate-control-pill" class="flex items-center gap-1.5 bg-white/70 px-3 py-1 rounded-full border border-white transition-all">
+<span class="text-[11px] text-slate-500 whitespace-nowrap">1 TWD ≈</span>
+<input id="exchange-rate-input" type="number" inputmode="decimal" step="0.01" value="42.5" disabled readonly
+onkeydown="if(event.key==='Enter'){ event.preventDefault(); applyRateInput(); }"
+class="w-16 text-center text-xs font-bold text-slate-600 bg-transparent outline-none disabled:opacity-80">
+<span id="rate-unit-label" class="text-[11px] text-slate-500">KRW</span>
+<button id="rate-confirm-btn" onclick="applyRateInput()" class="hidden w-6 h-6 rounded-full bg-teal-500 text-white items-center justify-center active:scale-90 transition-transform shadow-sm" title="確認修改匯率">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path>
+</svg>
+</button>
+<button id="rate-reset-btn" onclick="resetExchangeRate()" class="hidden w-6 h-6 rounded-full bg-slate-200/70 text-slate-600 items-center justify-center active:scale-90 transition-transform" title="恢復預設匯率">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+</svg>
+</button>
+</div>
+</div>
+
+<!-- 雙向輸入框 (外幣 ↔ 台幣) -->
+<div class="space-y-2.5">
+<!-- 外幣輸入 -->
+<div class="bg-white/75 rounded-2xl px-3.5 py-2.5 border border-white flex items-center justify-between gap-2">
+<div class="flex items-center gap-1.5 shrink-0">
+<span id="foreign-symbol" class="text-base font-bold text-teal-700">₩</span>
+<span id="foreign-code" class="text-xs font-semibold text-slate-500">KRW</span>
+</div>
+<input id="foreign-input" type="number" inputmode="decimal" oninput="convertFromForeign(this.value)" class="w-full text-right text-lg font-bold text-slate-800 bg-transparent outline-none">
+</div>
+
+<!-- 台幣輸入 -->
+<div class="bg-white/75 rounded-2xl px-3.5 py-2.5 border border-white flex items-center justify-between gap-2">
+<div class="flex items-center gap-1.5 shrink-0">
+<span class="text-base font-bold text-sky-600">$</span>
+<span class="text-xs font-semibold text-slate-500">TWD</span>
+</div>
+<input id="twd-input" type="number" inputmode="decimal" oninput="convertFromTWD(this.value)" class="w-full text-right text-lg font-bold text-slate-800 bg-transparent outline-none">
+</div>
+</div>
+
+<!-- 快速金額膠囊按鈕 -->
+<div id="quick-amount-bar" class="flex items-center justify-between gap-1.5 mt-3">
+<!-- 由 JS 動態生成對應幣別快速按鈕 -->
+</div>
+</section>
+
+<!-- 待買清單標題、統計與清空按鈕 -->
+<div class="flex items-center justify-between px-1">
+<span class="text-sm font-bold text-slate-800">待買清單</span>
+<div class="flex items-center gap-1.5">
+<span id="shopping-summary" class="text-xs font-semibold text-teal-700 bg-white/70 px-2.5 py-1 rounded-full border border-white">0 / 0 已購</span>
+<button id="clear-shopping-btn" onclick="openClearShoppingModal()" class="hidden px-2.5 py-1 rounded-full bg-rose-100/85 text-rose-600 hover:bg-rose-100 border border-rose-200/80 text-xs font-semibold items-center gap-1 active:scale-95 transition-all" title="清空所有待買清單">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"></path>
+</svg>
+<span>清空</span>
+</button>
+</div>
+</div>
+
+<!-- 待買分類膠囊列 (狀態篩選 + 類別篩選) -->
+<div id="shopping-category-pills" class="space-y-2 py-0.5">
+<!-- 由 JS 動態生成 -->
+</div>
+
+<!-- 搜尋地點框 (位於狀態/分類膠囊列正下方，僅搜尋購買地點) -->
+<div class="glass-card rounded-3xl p-2">
+<div class="flex items-center gap-2 bg-white/75 rounded-full px-3.5 py-2 border border-white">
+<svg class="w-4 h-4 text-teal-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"></path>
+</svg>
+<input id="shop-location-search" type="text" placeholder="搜尋購買地點 (如：樂天超市、海雲台)"
+onfocus="showSearchLocationSuggestions()"
+oninput="onShopLocationSearchInput(this.value)"
+onblur="hideSearchLocationSuggestionsDelayed()"
+class="flex-1 min-w-0 bg-transparent text-xs font-medium text-slate-800 placeholder-slate-400 outline-none">
+<button id="clear-search-location-btn" type="button" onclick="clearShopLocationSearch()" class="hidden w-5 h-5 rounded-full bg-slate-200/80 text-slate-600 items-center justify-center text-[10px] font-bold shrink-0 active:scale-90 transition-transform" title="清除搜尋">
+✕
+</button>
+</div>
+<!-- 點擊搜尋框時展開現有地點快速膠囊 -->
+<div id="search-location-suggestions-box" class="hidden mt-2 px-1 flex-wrap gap-1.5">
+<!-- 由 JS 動態生成目前清單存在的地點 -->
+</div>
+</div>
+
+<!-- 新增待買商品列 -->
+<div class="glass-card rounded-3xl p-2 space-y-2">
+<div class="flex items-center gap-1.5">
+<select id="new-shop-category" onchange="onNewShopCategoryChange()" class="bg-white/70 text-slate-700 text-xs font-medium rounded-full px-3 py-2 outline-none border border-white/80 shrink-0">
+<option value="吃的" selected>吃的</option>
+<option value="用的">用的</option>
+<option value="其他">其他</option>
+</select>
+<input id="new-shop-input" type="text" placeholder="想買的伴手禮 / 美妝..." class="flex-1 min-w-0 bg-transparent px-1.5 py-1.5 text-sm text-slate-800 placeholder-slate-400 outline-none" onkeypress="if(event.key==='Enter') addShoppingItem()">
+<!-- 新增時可選：伴手禮 / 現場吃 圓形圖示 -->
+<div id="new-shop-foodtag-group" class="flex items-center gap-1 shrink-0">
+<button id="new-tag-souvenir" type="button" onclick="toggleNewFoodTag('souvenir')" class="w-8 h-8 rounded-full bg-white/70 text-slate-400 border border-white/80 flex items-center justify-center active:scale-95 transition-all" title="伴手禮">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"></path>
+</svg>
+</button>
+<button id="new-tag-onsite" type="button" onclick="toggleNewFoodTag('onsite')" class="w-8 h-8 rounded-full bg-white/70 text-slate-400 border border-white/80 flex items-center justify-center active:scale-95 transition-all" title="現場吃">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M7 3v6a3 3 0 003 3v9M5 3v5a2 2 0 002 2M9 3v5a2 2 0 01-2 2m10-7v18m0-18c1.657 0 3 1.79 3 4v4h-3"></path>
+</svg>
+</button>
+</div>
+</div>
+<div class="space-y-1.5 pl-1">
+<div class="relative">
+<input id="new-shop-location" type="text" placeholder="購買地點 (如：海雲台、樂天超市)"
+onfocus="showLocationSuggestions()"
+oninput="renderLocationSuggestions()"
+onblur="hideLocationSuggestionsDelayed()"
+onkeypress="if(event.key==='Enter') addShoppingItem()"
+class="w-full bg-white/70 rounded-full px-3.5 py-2 text-xs font-medium text-slate-700 placeholder-slate-400 outline-none border border-white">
+<!-- 動態地點快速膠囊提示列 -->
+<div id="location-suggestions-box" class="hidden mt-1.5 px-1 flex-wrap gap-1.5">
+<!-- 由 JS 動態生成目前待買清單中存在的地點膠囊 -->
+</div>
+</div>
+<div class="flex items-center justify-between gap-2">
+<input id="new-shop-recommend" type="text" placeholder="推薦品項 / 口味 (如：明太子奶油風味)" class="flex-1 bg-white/70 rounded-full px-3.5 py-2 text-xs font-medium text-slate-700 placeholder-slate-400 outline-none border border-white" onkeypress="if(event.key==='Enter') addShoppingItem()">
+<button onclick="addShoppingItem()" class="iridescent-active px-4 py-2 rounded-full flex items-center justify-center gap-1 text-xs font-semibold shrink-0 active:scale-95 transition-transform">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+</svg>
+<span>新增</span>
+</button>
+</div>
+</div>
+</div>
+
+<!-- 待買商品列表 -->
+<div id="shopping-list-container" class="relative space-y-2.5">
+<!-- 由 JS 動態生成 -->
+</div>
+
+</main>
+
+<!-- 底部精緻小巧的一鍵恢復所有設定按鈕 -->
+<footer class="mt-8 flex justify-center">
+<button onclick="openResetModal()" class="glass-pill px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-rose-600 active:scale-95 transition-all">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+</svg>
+<span>恢復預設</span>
+</button>
+</footer>
+
+</div>
+
+<!-- 自訂毛玻璃確認恢復視窗 (不使用原生 confirm) -->
+<div id="reset-modal" class="fixed inset-0 z-50 hidden items-center justify-center px-6 bg-slate-900/25 backdrop-blur-sm transition-opacity">
+<div class="glass-card iridescent-border rounded-3xl p-6 w-full max-w-xs text-center shadow-2xl">
+<div class="w-11 h-11 rounded-full bg-rose-100/80 text-rose-500 flex items-center justify-center mx-auto mb-3 border border-white">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"></path>
+</svg>
+</div>
+<h3 class="text-base font-bold text-slate-800 mb-5">確定要恢復所有預設設定？</h3>
+<div class="grid grid-cols-2 gap-2.5">
+<button onclick="closeResetModal()" class="py-2.5 rounded-full bg-white/80 text-xs font-semibold text-slate-600 border border-white active:scale-95 transition-transform">
+取消
+</button>
+<button onclick="confirmResetAll()" class="py-2.5 rounded-full bg-rose-500 text-xs font-semibold text-white shadow-md shadow-rose-500/25 active:scale-95 transition-transform">
+確定恢復
+</button>
+</div>
+</div>
+</div>
+
+<!-- 自訂毛玻璃確認清空待買清單視窗 -->
+<div id="clear-shopping-modal" class="fixed inset-0 z-50 hidden items-center justify-center px-6 bg-slate-900/25 backdrop-blur-sm transition-opacity">
+<div class="glass-card iridescent-border rounded-3xl p-6 w-full max-w-xs text-center shadow-2xl">
+<div class="w-11 h-11 rounded-full bg-rose-100/80 text-rose-500 flex items-center justify-center mx-auto mb-3 border border-white">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"></path>
+</svg>
+</div>
+<h3 class="text-base font-bold text-slate-800 mb-5">確定要清空所有待買清單？</h3>
+<div class="grid grid-cols-2 gap-2.5">
+<button onclick="closeClearShoppingModal()" class="py-2.5 rounded-full bg-white/80 text-xs font-semibold text-slate-600 border border-white active:scale-95 transition-transform">
+取消
+</button>
+<button onclick="confirmClearShopping()" class="py-2.5 rounded-full bg-rose-500 text-xs font-semibold text-white shadow-md shadow-rose-500/25 active:scale-95 transition-transform">
+確定清空
+</button>
+</div>
+</div>
+</div>
+
+<!-- 自訂毛玻璃確認修改匯率視窗 -->
+<div id="rate-confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center px-6 bg-slate-900/25 backdrop-blur-sm transition-opacity">
+<div class="glass-card iridescent-border rounded-3xl p-6 w-full max-w-xs text-center shadow-2xl">
+<div class="w-11 h-11 rounded-full bg-teal-100/80 text-teal-600 flex items-center justify-center mx-auto mb-3 border border-white">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"></path>
+</svg>
+</div>
+<h3 class="text-base font-bold text-slate-800 mb-2">確定修改匯率基值？</h3>
+<p id="rate-confirm-text" class="text-sm font-medium text-slate-600 mb-5 leading-relaxed"></p>
+<div class="grid grid-cols-2 gap-2.5">
+<button onclick="cancelExchangeRateChange()" class="py-2.5 rounded-full bg-white/80 text-xs font-semibold text-slate-600 border border-white active:scale-95 transition-transform">
+取消
+</button>
+<button onclick="confirmExchangeRateChange()" class="py-2.5 rounded-full iridescent-active text-xs font-semibold active:scale-95 transition-transform">
+確定修改
+</button>
+</div>
+</div>
+</div>
+
+<!-- 輕量級訊息提示 Toast -->
+<div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-300">
+<div id="toast-msg" class="glass-card px-4 py-2 rounded-full text-xs font-semibold text-teal-900 shadow-lg border border-white"></div>
+</div>
+
+<script>
+// ==========================================
+// 1. 狀態與 2026/11/22~26 釜山深秋預設清單 (六大分類)
+// ==========================================
+const DEFAULT_TRIP_TITLE = 'BUSAN 釜山行';
+const DEFAULT_TRIP_DATE = '2026 • 11/22–26';
+const CURRENCY_CONFIGS = {
+KRW: {
+code: 'KRW',
+symbol: '₩',
+defaultRate: 42.5,
+quickAmounts: [
+{ label: '1千', val: 1000 },
+{ label: '5千', val: 5000 },
+{ label: '1萬', val: 10000 },
+{ label: '5萬', val: 50000 }
+]
+},
+JPY: {
+code: 'JPY',
+symbol: '¥',
+defaultRate: 4.75,
+quickAmounts: [
+{ label: '500', val: 500 },
+{ label: '1千', val: 1000 },
+{ label: '5千', val: 5000 },
+{ label: '1萬', val: 10000 }
+]
+},
+THB: {
+code: 'THB',
+symbol: '฿',
+defaultRate: 1.08,
+quickAmounts: [
+{ label: '100', val: 100 },
+{ label: '500', val: 500 },
+{ label: '1千', val: 1000 },
+{ label: '5千', val: 5000 }
+]
+}
+};
+const SIX_CATEGORIES = ['證件金融', '衣物配件', '3C網路', '盥洗保養', '美妝隱眼', '臨時藥品', '其他用品'];
+const SHOPPING_CATEGORIES = ['全部', '吃的', '用的', '其他'];
+
+const DEFAULT_PACKING_ITEMS = [
+// 證件金融
+{ id: 'p46', name: '身分證 (列印本或電子版本)', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p1', name: '護照 (效期6個月以上)', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p47', name: '簽證 (列印本或電子版本)', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p48', name: '往返機票 (列印本或電子版本)', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p49', name: '登機證 (機場或網路報到後取得)', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p50', name: '飯店預訂確認單', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p51', name: '國外住宿地址及聯繫電話', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p52', name: '旅遊票券 / 預約證明 (例：樂園、交通）', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p3', name: '交通卡 (例：T-money、Suica)', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p4', name: '外幣現鈔', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p27', name: '備用台幣', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p5', name: '海外高回饋信用卡', category: '證件金融', qty: 1, showQty: false, carryOn: true, checked: false },
+
+// 衣物配件
+{ id: 'p6', name: '防風保暖外套', category: '衣物配件', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p7', name: '發熱衣', category: '衣物配件', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p8', name: '發熱褲', category: '衣物配件', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p9', name: '針織毛衣 / 大學T', category: '衣物配件', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p10', name: '貼身內衣褲', category: '衣物配件', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p11', name: '襪子', category: '衣物配件', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p28', name: '睡衣睡褲', category: '衣物配件', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p29', name: '圍巾', category: '衣物配件', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p30', name: '毛帽', category: '衣物配件', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p31', name: '手套', category: '衣物配件', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p45', name: '皮帶', category: '衣物配件', qty: 1, showQty: false, carryOn: false, checked: false },
+
+// 3C網路
+{ id: 'p12', name: 'SIM卡 / eSIM / 漫遊開通', category: '3C網路', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p13', name: '韓國雙圓孔轉接頭 (220V)', category: '3C網路', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p14', name: '行動電源 (絕緣膠帶＋透明夾鏈袋)', category: '3C網路', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p15', name: '手機充電線 / 充電頭', category: '3C網路', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p16', name: '多頭充電線 (行動電源用)', category: '3C網路', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p26', name: '備用充電頭 (行動電源用)', category: '3C網路', qty: 1, showQty: true, carryOn: false, checked: false },
+
+// 盥洗保養
+{ id: 'p17', name: '牙刷 & 牙膏', category: '盥洗保養', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p20', name: '洗面乳', category: '盥洗保養', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p53', name: '卸妝用品', category: '盥洗保養', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p18', name: '高保濕乳液', category: '盥洗保養', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p32', name: '精華 / 化妝水', category: '盥洗保養', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p34', name: '痘痘藥膏', category: '盥洗保養', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p19', name: '護唇膏', category: '盥洗保養', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p33', name: '護手霜', category: '盥洗保養', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p35', name: '防曬乳', category: '盥洗保養', qty: 1, showQty: false, carryOn: true, checked: false },
+
+// 美妝隱眼
+{ id: 'p58', name: '粉底液', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p66', name: '粉餅', category: '美妝隱眼', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p59', name: '遮瑕', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p60', name: '眼影', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p61', name: '眼線 / 眼線膠筆', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p62', name: '睫毛膏', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p63', name: '睫毛夾', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p64', name: '腮紅', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p65', name: '口紅 / 唇釉', category: '美妝隱眼', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p67', name: '隱形眼鏡', category: '美妝隱眼', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p68', name: '隱形眼鏡專用夾', category: '美妝隱眼', qty: 1, showQty: false, carryOn: false, checked: false },
+
+// 臨時藥品
+{ id: 'p21', name: '腸胃藥 / 止瀉藥', category: '臨時藥品', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p22', name: '感冒藥', category: '臨時藥品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p36', name: '暈車藥', category: '臨時藥品', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p37', name: '痘痘藥', category: '臨時藥品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p38', name: '保健食品', category: '臨時藥品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p23', name: '休足時間 / OK繃', category: '臨時藥品', qty: 1, showQty: false, carryOn: false, checked: false },
+
+// 其他用品
+{ id: 'p24', name: '折疊購物袋', category: '其他用品', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p25', name: '折疊晴雨傘', category: '其他用品', qty: 1, showQty: true, carryOn: false, checked: false },
+{ id: 'p40', name: '口罩', category: '其他用品', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p54', name: '空水壺', category: '其他用品', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p69', name: '眼鏡 & 眼鏡盒', category: '其他用品', qty: 1, showQty: false, carryOn: true, checked: false },
+{ id: 'p70', name: '隨身鏡 / 化妝鏡', category: '其他用品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p39', name: '梳子', category: '其他用品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p55', name: '髮圈', category: '其他用品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p56', name: '瀏海髮捲 / 髮夾', category: '其他用品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p57', name: '衛生棉', category: '其他用品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p41', name: '隨身面紙', category: '其他用品', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p42', name: '隨身濕紙巾', category: '其他用品', qty: 1, showQty: true, carryOn: true, checked: false },
+{ id: 'p43', name: '小鑷子', category: '其他用品', qty: 1, showQty: false, carryOn: false, checked: false },
+{ id: 'p44', name: '原子筆（填寫現場文件使用）', category: '其他用品', qty: 1, showQty: false, carryOn: true, checked: false }
+];
+
+const DEFAULT_SHOPPING_ITEMS = [
+{ id: 's1', name: 'Olive Young 保濕棉片 / 精華', category: '用的', foodTag: null, location: 'Olive Young', recommend: '', bought: false },
+{ id: 's6', name: 'FIXX 全天候超完美定妝噴霧', category: '用的', foodTag: null, location: 'Olive Young', recommend: '', bought: false },
+{ id: 's2', name: 'BUSAN BADA SAND 焦糖奶油夾心餅', category: '吃的', foodTag: 'souvenir', location: '海雲台、釜山站店', recommend: '焦糖奶油夾心餅', bought: false },
+{ id: 's4', name: 'HBAF 杏仁果多口味組', category: '吃的', foodTag: 'souvenir', location: '各大超市、Olive Young', recommend: '蜂蜜奶油、芥末、烤玉米', bought: false },
+{ id: 's7', name: 'BEURRE 釜山限定海苔（明太子奶油風味）', category: '吃的', foodTag: 'souvenir', location: '樂天超市、Homeplus、各大超商', recommend: '明太子奶油風味', bought: false },
+{ id: 's8', name: 'Keveren House（캐버린하우스）', category: '吃的', foodTag: 'souvenir', location: '海雲台', recommend: '法式奶油蝴蝶酥、Busan Butter Pie', bought: false },
+{ id: 's14', name: 'Keveren House（캐버린하우스）DUPLIT BREAD', category: '吃的', foodTag: 'onsite', location: '海雲台', recommend: 'DUPLIT BREAD（新型態甜點）伯爵奶油、濃厚生巧克力', bought: false },
+{ id: 's9', name: '二代名菓（이대명과）傳統手工煎餅', category: '吃的', foodTag: 'souvenir', location: '海雲台、南浦洞、各大百貨', recommend: '花生、芝麻花生、海苔', bought: false },
+{ id: 's10', name: 'B&C Bakery（비엔씨제과）派皮紅豆饅頭', category: '吃的', foodTag: 'souvenir', location: '釜山站店、南浦洞、樂天百貨', recommend: '派皮紅豆（Pie Manju）、起司', bought: false },
+{ id: 's11', name: '古來思魚糕（고래사어묵）現炸魚板', category: '吃的', foodTag: 'onsite', location: '海雲台、札嘎其店、釜山站店', recommend: '奶酪起司魚丸、整隻鮮蝦魚餅、年糕魚糕', bought: false },
+{ id: 's12', name: 'OPS烘焙屋（옵스）馬斯卡彭布丁與鮮奶油泡芙', category: '吃的', foodTag: 'onsite', location: '海雲台、樂天百貨', recommend: '馬斯卡彭布丁、巨型卡士達泡芙', bought: false },
+{ id: 's13', name: 'CHEFFLE（치플레）起司舒芙蕾蛋糕', category: '吃的', foodTag: 'onsite', location: '新世界百貨、廣安里分店', recommend: '焦糖布蕾、原味', bought: false }
+];
+
+const STORAGE_KEY = 'busan_2026_trip_data_v2';
+
+let appState = {
+tripTitle: DEFAULT_TRIP_TITLE,
+tripDate: DEFAULT_TRIP_DATE,
+packingItems: [],
+shoppingItems: [],
+selectedCurrency: 'KRW',
+exchangeRates: {
+KRW: CURRENCY_CONFIGS.KRW.defaultRate,
+JPY: CURRENCY_CONFIGS.JPY.defaultRate,
+THB: CURRENCY_CONFIGS.THB.defaultRate
+},
+isUnlocked: false,
+pendingRateValue: null,
+currentTab: 'packing',
+currentFilter: 'all',
+currentCategory: '全部',
+currentShopCategory: '全部',
+currentShopStatus: 'all',
+shopLocationQuery: '',
+newItemCarryOn: false,
+newShopFoodTag: null
+};
+
+// ==========================================
+// 2. 初始化、儲存與恢復預設邏輯
+// ==========================================
+function normalizeLocationNames(rawLoc) {
+if (typeof rawLoc !== 'string') return rawLoc;
+return rawLoc
+.replace(/\s*\/\s*/g, '、')
+.replace(/Olive Young\s*門市/g, 'Olive Young')
+.replace(/海雲台（新型態甜點）/g, '海雲台')
+.replace(/海雲台本店/g, '海雲台')
+.replace(/海雲台店/g, '海雲台')
+.replace(/釜山站伴手禮區/g, '釜山站店')
+.replace(/樂天超市（Lotte Mart）/g, '樂天超市');
+}
+
+function loadState() {
+try {
+const raw = localStorage.getItem(STORAGE_KEY);
+if (raw) {
+const parsed = JSON.parse(raw);
+appState.tripTitle = parsed.tripTitle || DEFAULT_TRIP_TITLE;
+appState.tripDate = parsed.tripDate || DEFAULT_TRIP_DATE;
+if (Array.isArray(parsed.packingItems)) {
+const existingIds = new Set(parsed.packingItems.map(i => i.id));
+let updatedItems = parsed.packingItems
+.filter(item => item.id !== 'p2')
+.map(item => {
+let nextItem = item.category === '美妝用品' ? { ...item, category: '美妝隱眼' } : { ...item };
+if (nextItem.id === 'p47' && nextItem.name === '簽證(列印本或電子版本)') return { ...nextItem, name: '簽證 (列印本或電子版本)' };
+if (nextItem.id === 'p48' && nextItem.name === '往返機票(列印本或電子版本)') return { ...nextItem, name: '往返機票 (列印本或電子版本)' };
+if (nextItem.id === 'p52' && (nextItem.name === '旅遊票券/預約證明(例如：樂園、體驗、交通）' || nextItem.name === '旅遊票券 / 預約證明(例：樂園、交通）')) return { ...nextItem, name: '旅遊票券 / 預約證明 (例：樂園、交通）' };
+if (nextItem.id === 'p3' && nextItem.name === 'WOWPASS / T-money 交通卡') return { ...nextItem, name: '交通卡 (例：T-money、Suica)' };
+if (nextItem.id === 'p4' && nextItem.name === '韓元現鈔') return { ...nextItem, name: '外幣現鈔' };
+if (nextItem.id === 'p12' && (nextItem.name === '韓國 eSIM / 漫遊開通' || nextItem.name === 'SIM卡／eSIM／漫遊開通')) return { ...nextItem, name: 'SIM卡 / eSIM / 漫遊開通' };
+if (nextItem.id === 'p14' && (nextItem.name === '行動電源 (須隨身登機)' || nextItem.name === '行動電源(絕緣膠帶＋透明夾鏈袋)')) return { ...nextItem, name: '行動電源 (絕緣膠帶＋透明夾鏈袋)' };
+if (nextItem.id === 'p16' && nextItem.name === '多頭充電線(行動電源用)') return { ...nextItem, name: '多頭充電線 (行動電源用)' };
+if (nextItem.id === 'p26' && nextItem.name === '備用充電頭(行動電源用)') return { ...nextItem, name: '備用充電頭 (行動電源用)' };
+if (nextItem.id === 'p17' && nextItem.name === '牙刷 & 牙膏 (韓國飯店不提供)') return { ...nextItem, name: '牙刷 & 牙膏' };
+if (nextItem.id === 'p32' && nextItem.name === '精華/化妝水') return { ...nextItem, name: '精華 / 化妝水' };
+if (nextItem.id === 'p61' && nextItem.name === '眼線/眼線膠筆') return { ...nextItem, name: '眼線 / 眼線膠筆' };
+if (nextItem.id === 'p65' && nextItem.name === '口紅/唇釉') return { ...nextItem, name: '口紅 / 唇釉' };
+if (nextItem.id === 'p21' && nextItem.name === '腸胃藥 & 止瀉藥') return { ...nextItem, name: '腸胃藥 / 止瀉藥' };
+if (nextItem.id === 'p23' && nextItem.name === '休足時間 / 痠痛貼布 & OK繃') return { ...nextItem, name: '休足時間 / OK繃' };
+if (nextItem.id === 'p38' && nextItem.name === '魚油') return { ...nextItem, name: '保健食品' };
+if (nextItem.id === 'p24' && nextItem.name === '折疊購物袋 (韓國塑膠袋需付費)') return { ...nextItem, name: '折疊購物袋' };
+if (nextItem.id === 'p25' && nextItem.name === '折疊晴雨傘 (海邊防陣雨)') return { ...nextItem, name: '折疊晴雨傘' };
+if (nextItem.id === 'p56' && (nextItem.name === '瀏海髮夾' || nextItem.name === '瀏海髮捲/髮夾')) return { ...nextItem, name: '瀏海髮捲 / 髮夾' };
+if (nextItem.id === 'p44' && nextItem.name === '原子筆（放隨身包 填寫現場文件使用）') return { ...nextItem, name: '原子筆（填寫現場文件使用）' };
+if (nextItem.id === 'p69') return { ...nextItem, carryOn: true };
+if (nextItem.id === 'p70' && nextItem.name === '隨身鏡') return { ...nextItem, name: '隨身鏡 / 化妝鏡', carryOn: false };
+return nextItem;
+});
+const missingDefaults = DEFAULT_PACKING_ITEMS.filter(def => !existingIds.has(def.id));
+updatedItems = [...updatedItems, ...missingDefaults];
+
+const idCardIdx = updatedItems.findIndex(i => i.id === 'p46');
+const passportIdx = updatedItems.findIndex(i => i.id === 'p1');
+if (idCardIdx !== -1 && passportIdx !== -1 && idCardIdx > passportIdx) {
+const [idCardItem] = updatedItems.splice(idCardIdx, 1);
+const newPassportIdx = updatedItems.findIndex(i => i.id === 'p1');
+updatedItems.splice(newPassportIdx, 0, idCardItem);
+}
+
+const makeupRemoverIdx = updatedItems.findIndex(i => i.id === 'p53');
+const cleanserIdx = updatedItems.findIndex(i => i.id === 'p20');
+if (makeupRemoverIdx !== -1 && cleanserIdx !== -1 && makeupRemoverIdx < cleanserIdx) {
+const [makeupRemoverItem] = updatedItems.splice(makeupRemoverIdx, 1);
+const newCleanserIdx = updatedItems.findIndex(i => i.id === 'p20');
+updatedItems.splice(newCleanserIdx + 1, 0, makeupRemoverItem);
+}
+
+const powderIdx = updatedItems.findIndex(i => i.id === 'p66');
+const foundationIdx = updatedItems.findIndex(i => i.id === 'p58');
+if (powderIdx !== -1 && foundationIdx !== -1 && powderIdx !== foundationIdx + 1) {
+const [powderItem] = updatedItems.splice(powderIdx, 1);
+const newFoundationIdx = updatedItems.findIndex(i => i.id === 'p58');
+updatedItems.splice(newFoundationIdx + 1, 0, powderItem);
+}
+
+const maskIdx = updatedItems.findIndex(i => i.id === 'p40');
+const bottleIdx = updatedItems.findIndex(i => i.id === 'p54');
+if (maskIdx !== -1 && bottleIdx !== -1 && maskIdx > bottleIdx) {
+const [maskItem] = updatedItems.splice(maskIdx, 1);
+const newBottleIdx = updatedItems.findIndex(i => i.id === 'p54');
+updatedItems.splice(newBottleIdx, 0, maskItem);
+}
+
+appState.packingItems = updatedItems;
+} else {
+appState.packingItems = JSON.parse(JSON.stringify(DEFAULT_PACKING_ITEMS));
+}
+appState.shoppingItems = Array.isArray(parsed.shoppingItems)
+? parsed.shoppingItems.map(item => ({
+...item,
+location: normalizeLocationNames(item.location),
+recommend: item.id === 's14' && item.recommend === '伯爵奶油、濃厚生巧克力'
+? 'DUPLIT BREAD（新型態甜點）伯爵奶油、濃厚生巧克力'
+: item.recommend
+}))
+: JSON.parse(JSON.stringify(DEFAULT_SHOPPING_ITEMS));
+appState.selectedCurrency = parsed.selectedCurrency && CURRENCY_CONFIGS[parsed.selectedCurrency] ? parsed.selectedCurrency : 'KRW';
+if (parsed.exchangeRates) {
+appState.exchangeRates = {
+KRW: parseFloat(parsed.exchangeRates.KRW) || CURRENCY_CONFIGS.KRW.defaultRate,
+JPY: parseFloat(parsed.exchangeRates.JPY) || CURRENCY_CONFIGS.JPY.defaultRate,
+THB: parseFloat(parsed.exchangeRates.THB) || CURRENCY_CONFIGS.THB.defaultRate
+};
+}
+} else {
+appState.packingItems = JSON.parse(JSON.stringify(DEFAULT_PACKING_ITEMS));
+appState.shoppingItems = JSON.parse(JSON.stringify(DEFAULT_SHOPPING_ITEMS));
+}
+} catch (e) {
+appState.packingItems = JSON.parse(JSON.stringify(DEFAULT_PACKING_ITEMS));
+appState.shoppingItems = JSON.parse(JSON.stringify(DEFAULT_SHOPPING_ITEMS));
+}
+}
+
+function saveState() {
+try {
+localStorage.setItem(STORAGE_KEY, JSON.stringify({
+tripTitle: appState.tripTitle,
+tripDate: appState.tripDate,
+packingItems: appState.packingItems,
+shoppingItems: appState.shoppingItems,
+selectedCurrency: appState.selectedCurrency,
+exchangeRates: appState.exchangeRates
+}));
+} catch (e) {
+console.warn('無法儲存至 localStorage', e);
+}
+}
+
+function manualSave() {
+saveState();
+showToast('已儲存至本機');
+}
+
+function openResetModal() {
+const modal = document.getElementById('reset-modal');
+modal.classList.remove('hidden');
+modal.classList.add('flex');
+}
+
+function closeResetModal() {
+const modal = document.getElementById('reset-modal');
+modal.classList.add('hidden');
+modal.classList.remove('flex');
+}
+
+function confirmResetAll() {
+localStorage.removeItem(STORAGE_KEY);
+appState.tripTitle = DEFAULT_TRIP_TITLE;
+appState.tripDate = DEFAULT_TRIP_DATE;
+appState.packingItems = JSON.parse(JSON.stringify(DEFAULT_PACKING_ITEMS));
+appState.shoppingItems = JSON.parse(JSON.stringify(DEFAULT_SHOPPING_ITEMS));
+appState.selectedCurrency = 'KRW';
+appState.exchangeRates = {
+KRW: CURRENCY_CONFIGS.KRW.defaultRate,
+JPY: CURRENCY_CONFIGS.JPY.defaultRate,
+THB: CURRENCY_CONFIGS.THB.defaultRate
+};
+appState.isUnlocked = false;
+appState.currentFilter = 'all';
+appState.currentCategory = '全部';
+appState.currentShopCategory = '全部';
+appState.currentShopStatus = 'all';
+appState.shopLocationQuery = '';
+appState.pendingRateValue = null;
+
+document.title = `${DEFAULT_TRIP_TITLE} • 旅遊小助手`;
+document.getElementById('foreign-input').value = '';
+document.getElementById('twd-input').value = '';
+const searchInput = document.getElementById('shop-location-search');
+if (searchInput) searchInput.value = '';
+const clearSearchBtn = document.getElementById('clear-search-location-btn');
+if (clearSearchBtn) {
+clearSearchBtn.classList.add('hidden');
+clearSearchBtn.classList.remove('flex');
+}
+
+saveState();
+renderTripHeader();
+updateLockUI();
+renderCurrencyUI();
+renderCategoryPills();
+renderPackingList();
+renderShoppingCategoryPills();
+renderShoppingList();
+closeResetModal();
+showToast('已恢復所有預設設定');
+}
+
+// ==========================================
+// 3. 標題與日期可編輯渲染
+// ==========================================
+function renderTripHeader() {
+const container = document.getElementById('trip-header-container');
+if (!container) return;
+
+if (appState.isUnlocked) {
+container.innerHTML = `
+<div class="flex items-center gap-1.5">
+<input type="text" value="${escapeHtml(appState.tripDate)}"
+onchange="updateTripDate(this.value)"
+placeholder="日期 (如 2026 • 11/22–26)"
+class="px-2.5 py-0.5 text-xs font-semibold tracking-wider text-teal-800 rounded-full border editable-highlight outline-none w-40">
+<span id="offline-badge" class="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="離線就緒"></span>
+</div>
+<input type="text" value="${escapeHtml(appState.tripTitle)}"
+onchange="updateTripTitle(this.value)"
+placeholder="旅程標題"
+class="w-full text-xl font-bold tracking-tight text-slate-800 mt-1 px-2 py-0.5 rounded-xl border editable-highlight outline-none">
+`;
+} else {
+container.innerHTML = `
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 text-xs font-semibold tracking-wider text-teal-800 bg-white/70 rounded-full border border-white">${escapeHtml(appState.tripDate)}</span>
+<span id="offline-badge" class="w-2 h-2 rounded-full bg-emerald-500" title="離線就緒"></span>
+</div>
+<h1 class="text-2xl font-bold tracking-tight text-slate-800 mt-1 truncate">${escapeHtml(appState.tripTitle)}</h1>
+`;
+}
+updateNetworkStatusUI(false);
+}
+
+function updateTripTitle(val) {
+const trimmed = val.trim();
+if (!trimmed) return;
+appState.tripTitle = trimmed;
+document.title = `${trimmed} • 旅遊小助手`;
+saveState();
+}
+
+function updateTripDate(val) {
+const trimmed = val.trim();
+if (!trimmed) return;
+appState.tripDate = trimmed;
+saveState();
+}
+
+// ==========================================
+// 4. 分頁切換與編輯鎖定邏輯
+// ==========================================
+function switchTab(tab) {
+appState.currentTab = tab;
+const packingSec = document.getElementById('tab-packing');
+const shoppingSec = document.getElementById('tab-shopping');
+const navPacking = document.getElementById('nav-packing');
+const navShopping = document.getElementById('nav-shopping');
+
+if (tab === 'packing') {
+packingSec.classList.remove('hidden');
+shoppingSec.classList.add('hidden');
+navPacking.className = 'iridescent-active rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all';
+navShopping.className = 'rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:bg-white/50 transition-all';
+} else {
+packingSec.classList.add('hidden');
+shoppingSec.classList.remove('hidden');
+navShopping.className = 'iridescent-active rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all';
+navPacking.className = 'rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:bg-white/50 transition-all';
+}
+updateStickyMiniBar();
+}
+
+function toggleEditLock() {
+appState.isUnlocked = !appState.isUnlocked;
+updateLockUI();
+renderTripHeader();
+renderPackingList();
+renderShoppingList();
+updateStickyMiniBar();
+showToast(appState.isUnlocked ? '已解鎖：按住左側把手可上下拖移排序' : '已鎖定內容，防止誤觸');
+}
+
+function updateLockUI() {
+const lockIcon = document.getElementById('lock-icon');
+const lockText = document.getElementById('lock-text');
+const rateInput = document.getElementById('exchange-rate-input');
+const rateConfirmBtn = document.getElementById('rate-confirm-btn');
+const rateResetBtn = document.getElementById('rate-reset-btn');
+const rateControlPill = document.getElementById('rate-control-pill');
+const clearShopBtn = document.getElementById('clear-shopping-btn');
+
+if (appState.isUnlocked) {
+lockText.textContent = '可編輯';
+lockText.classList.add('text-teal-700', 'font-bold');
+lockIcon.innerHTML = `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>`;
+
+if (rateInput) {
+rateInput.disabled = false;
+rateInput.readOnly = false;
+rateInput.classList.remove('text-slate-600');
+rateInput.classList.add('text-teal-800', 'bg-white', 'rounded-md', 'px-1.5');
+}
+if (rateConfirmBtn) {
+rateConfirmBtn.classList.remove('hidden');
+rateConfirmBtn.classList.add('flex');
+}
+if (rateResetBtn) {
+rateResetBtn.classList.remove('hidden');
+rateResetBtn.classList.add('flex');
+}
+if (rateControlPill) {
+rateControlPill.classList.add('editable-highlight');
+}
+if (clearShopBtn) {
+clearShopBtn.classList.remove('hidden');
+clearShopBtn.classList.add('flex');
+}
+} else {
+lockText.textContent = '已鎖定';
+lockText.classList.remove('text-teal-700', 'font-bold');
+lockIcon.innerHTML = `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`;
+
+if (rateInput) {
+rateInput.disabled = true;
+rateInput.readOnly = true;
+rateInput.value = appState.exchangeRates[appState.selectedCurrency];
+rateInput.classList.add('text-slate-600');
+rateInput.classList.remove('text-teal-800', 'bg-white', 'rounded-md', 'px-1.5');
+}
+if (rateConfirmBtn) {
+rateConfirmBtn.classList.add('hidden');
+rateConfirmBtn.classList.remove('flex');
+}
+if (rateResetBtn) {
+rateResetBtn.classList.add('hidden');
+rateResetBtn.classList.remove('flex');
+}
+if (rateControlPill) {
+rateControlPill.classList.remove('editable-highlight');
+}
+if (clearShopBtn) {
+clearShopBtn.classList.add('hidden');
+clearShopBtn.classList.remove('flex');
+}
+}
+}
+
+function handleLockedTap() {
+showToast('目前為鎖定狀態，點擊右上角「已鎖定」即可編輯');
+}
+
+// ==========================================
+// 5. 匯率三選一與雙向換算邏輯
+// ==========================================
+function selectCurrency(code) {
+if (!CURRENCY_CONFIGS[code]) return;
+appState.selectedCurrency = code;
+saveState();
+renderCurrencyUI();
+
+const foreignVal = document.getElementById('foreign-input').value;
+if (foreignVal) {
+convertFromForeign(foreignVal);
+}
+}
+
+function renderCurrencyUI() {
+const code = appState.selectedCurrency;
+const cfg = CURRENCY_CONFIGS[code];
+const rate = appState.exchangeRates[code];
+
+['KRW', 'JPY', 'THB'].forEach(c => {
+const btn = document.getElementById(`curr-btn-${c}`);
+if (!btn) return;
+if (c === code) {
+btn.className = 'py-1.5 rounded-full text-xs font-bold transition-all iridescent-active shadow-sm';
+} else {
+btn.className = 'py-1.5 rounded-full text-xs font-bold transition-all text-slate-600 hover:bg-white/60';
+}
+});
+
+const rateInput = document.getElementById('exchange-rate-input');
+const unitLabel = document.getElementById('rate-unit-label');
+const foreignSymbol = document.getElementById('foreign-symbol');
+const foreignCode = document.getElementById('foreign-code');
+
+if (rateInput) rateInput.value = rate;
+if (unitLabel) unitLabel.textContent = code;
+if (foreignSymbol) foreignSymbol.textContent = cfg.symbol;
+if (foreignCode) foreignCode.textContent = code;
+
+const quickBar = document.getElementById('quick-amount-bar');
+if (quickBar) {
+quickBar.innerHTML = cfg.quickAmounts.map(q => `
+<button onclick="setQuickForeign(${q.val})" class="flex-1 py-1.5 rounded-full bg-white/75 text-xs font-semibold text-teal-800 border border-white active:scale-95 transition-transform">
+${q.label}
+</button>
+`).join('') + `
+<button onclick="clearCalculator()" class="px-3 py-1.5 rounded-full bg-slate-200/75 text-xs font-semibold text-slate-600 active:scale-95 transition-transform">
+清除
+</button>
+`;
+}
+}
+
+function applyRateInput() {
+if (!appState.isUnlocked) return;
+const input = document.getElementById('exchange-rate-input');
+const newVal = parseFloat(input.value);
+const code = appState.selectedCurrency;
+const oldVal = appState.exchangeRates[code];
+
+if (isNaN(newVal) || newVal <= 0) {
+input.value = oldVal;
+showToast('請輸入有效的匯率數值');
+return;
+}
+
+if (newVal === oldVal) {
+showToast('匯率未變更');
+return;
+}
+
+appState.pendingRateValue = newVal;
+document.getElementById('rate-confirm-text').innerHTML = `確定要將 <span class="font-bold text-teal-700">${code}</span> 匯率從 <span class="font-bold text-slate-800">${oldVal}</span> 改成 <span class="font-bold text-teal-700">${newVal}</span>？`;
+const modal = document.getElementById('rate-confirm-modal');
+modal.classList.remove('hidden');
+modal.classList.add('flex');
+}
+
+function cancelExchangeRateChange() {
+const code = appState.selectedCurrency;
+document.getElementById('exchange-rate-input').value = appState.exchangeRates[code];
+appState.pendingRateValue = null;
+const modal = document.getElementById('rate-confirm-modal');
+modal.classList.add('hidden');
+modal.classList.remove('flex');
+}
+
+function confirmExchangeRateChange() {
+const code = appState.selectedCurrency;
+if (appState.pendingRateValue && appState.pendingRateValue > 0) {
+appState.exchangeRates[code] = appState.pendingRateValue;
+saveState();
+const foreignVal = document.getElementById('foreign-input').value;
+if (foreignVal) {
+convertFromForeign(foreignVal);
+}
+showToast(`已更新 ${code} 匯率為 ${appState.pendingRateValue}`);
+}
+appState.pendingRateValue = null;
+const modal = document.getElementById('rate-confirm-modal');
+modal.classList.add('hidden');
+modal.classList.remove('flex');
+}
+
+function resetExchangeRate() {
+if (!appState.isUnlocked) return;
+const code = appState.selectedCurrency;
+const defaultRate = CURRENCY_CONFIGS[code].defaultRate;
+const oldVal = appState.exchangeRates[code];
+if (oldVal === defaultRate) {
+showToast('目前已是預設匯率');
+return;
+}
+document.getElementById('exchange-rate-input').value = defaultRate;
+applyRateInput();
+}
+
+function convertFromForeign(val) {
+const twdInput = document.getElementById('twd-input');
+const num = parseFloat(val);
+if (isNaN(num) || val === '') {
+twdInput.value = '';
+return;
+}
+const rate = appState.exchangeRates[appState.selectedCurrency];
+twdInput.value = Math.round(num / rate);
+}
+
+function convertFromTWD(val) {
+const foreignInput = document.getElementById('foreign-input');
+const num = parseFloat(val);
+if (isNaN(num) || val === '') {
+foreignInput.value = '';
+return;
+}
+const rate = appState.exchangeRates[appState.selectedCurrency];
+foreignInput.value = Math.round(num * rate);
+}
+
+function setQuickForeign(amount) {
+const foreignInput = document.getElementById('foreign-input');
+foreignInput.value = amount;
+convertFromForeign(amount);
+}
+
+function clearCalculator() {
+document.getElementById('foreign-input').value = '';
+document.getElementById('twd-input').value = '';
+}
+
+// ==========================================
+// 6. 攜帶清單渲染與篩選邏輯
+// ==========================================
+function setFilter(filter) {
+appState.currentFilter = filter;
+renderCategoryPills();
+renderPackingList();
+}
+
+function setCategory(cat) {
+appState.currentCategory = cat;
+if (appState.currentFilter === 'carryon') {
+appState.currentFilter = 'all';
+}
+renderCategoryPills();
+renderPackingList();
+}
+
+function toggleNewItemCarryOn() {
+appState.newItemCarryOn = !appState.newItemCarryOn;
+const btn = document.getElementById('new-item-carryon-btn');
+if (appState.newItemCarryOn) {
+btn.className = 'px-2.5 py-2 rounded-full bg-sky-500 text-white border border-sky-400 text-xs font-semibold shrink-0 active:scale-95 transition-all shadow-sm';
+} else {
+btn.className = 'px-2.5 py-2 rounded-full bg-white/70 text-slate-500 border border-white/80 text-xs font-semibold shrink-0 active:scale-95 transition-all';
+}
+}
+
+function renderCategoryPills() {
+const container = document.getElementById('category-pills');
+const carryOnCount = appState.packingItems.filter(i => i.carryOn).length;
+const isAllActive = appState.currentCategory === '全部' && appState.currentFilter !== 'carryon';
+const isCarryOnActive = appState.currentFilter === 'carryon';
+const firstSixCategories = SIX_CATEGORIES.filter(cat => cat !== '其他用品');
+const isOtherActive = appState.currentFilter !== 'carryon' && appState.currentCategory === '其他用品';
+
+const topRowHtml = `
+<div>
+<button onclick="setCategory('全部')" class="w-full py-2 rounded-full text-xs font-semibold text-center transition-all active:scale-95 ${
+isAllActive
+? 'iridescent-active shadow-md'
+: 'glass-pill text-slate-600 hover:bg-white/80'
+}">
+全部
+</button>
+</div>
+`;
+
+const sixGridHtml = `
+<div class="grid grid-cols-3 gap-2">
+${firstSixCategories.map(cat => {
+const active = appState.currentFilter !== 'carryon' && appState.currentCategory === cat;
+return `
+<button onclick="setCategory('${cat}')" class="py-2 rounded-full text-xs font-semibold text-center transition-all active:scale-95 ${
+active
+? 'iridescent-active shadow-md'
+: 'glass-pill text-slate-600 hover:bg-white/80'
+}">
+${cat}
+</button>
+`;
+}).join('')}
+</div>
+`;
+
+const bottomRowHtml = `
+<div class="grid grid-cols-2 gap-2">
+<button onclick="setCategory('其他用品')" class="py-2 rounded-full text-xs font-semibold text-center transition-all active:scale-95 ${
+isOtherActive
+? 'iridescent-active shadow-md'
+: 'glass-pill text-slate-600 hover:bg-white/80'
+}">
+其他用品
+</button>
+<button onclick="setFilter('carryon')" class="py-2 rounded-full text-xs font-semibold text-center transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+isCarryOnActive
+? 'bg-sky-500 text-white shadow-md border border-sky-300'
+: 'glass-pill text-sky-700 hover:bg-white/80'
+}">
+<span>隨身包</span>
+<span class="px-1.5 py-0.2 rounded-full text-[10px] ${isCarryOnActive ? 'bg-white/25 text-white' : 'bg-sky-100 text-sky-700'}">${carryOnCount}</span>
+</button>
+</div>
+`;
+
+container.innerHTML = topRowHtml + sixGridHtml + bottomRowHtml;
+}
+
+function renderPackingList() {
+const total = appState.packingItems.length;
+const checkedCount = appState.packingItems.filter(i => i.checked).length;
+const uncheckedCount = total - checkedCount;
+const percent = total === 0 ? 0 : Math.round((checkedCount / total) * 100);
+
+document.getElementById('count-all').textContent = total;
+document.getElementById('count-checked').textContent = checkedCount;
+document.getElementById('count-unchecked').textContent = uncheckedCount;
+document.getElementById('progress-percent').textContent = `${percent}%`;
+document.getElementById('progress-bar').style.width = `${percent}%`;
+
+['all', 'checked', 'unchecked'].forEach(f => {
+const btn = document.getElementById(`stat-${f}`);
+if (!btn) return;
+if (appState.currentFilter === f) {
+btn.classList.add('bg-white/85', 'border-teal-400/60', 'shadow-sm');
+btn.classList.remove('bg-white/40', 'border-white/60');
+} else {
+btn.classList.remove('bg-white/85', 'border-teal-400/60', 'shadow-sm');
+btn.classList.add('bg-white/40', 'border-white/60');
+}
+});
+
+const filtered = appState.packingItems.filter(item => {
+if (appState.currentFilter === 'checked' && !item.checked) return false;
+if (appState.currentFilter === 'unchecked' && item.checked) return false;
+if (appState.currentFilter === 'carryon') return !!item.carryOn;
+if (appState.currentCategory !== '全部' && item.category !== appState.currentCategory) return false;
+return true;
+});
+
+const container = document.getElementById('packing-list-container');
+if (filtered.length === 0) {
+container.innerHTML = `
+<div class="glass-card rounded-3xl py-8 text-center text-sm text-slate-400">
+此篩選條件下目前沒有物品
+</div>
+`;
+updateStickyMiniBar();
+return;
+}
+
+container.innerHTML = filtered.map(item => `
+<div data-id="${item.id}" class="sortable-item glass-card rounded-2xl p-3 flex items-center gap-2 ${item.checked ? 'opacity-65 bg-white/40' : ''}">
+${appState.isUnlocked ? `
+<div onpointerdown="startItemDrag(event, '${item.id}', 'packing')" class="drag-handle text-teal-600/80 hover:text-teal-700 py-2 px-1.5 -ml-1 rounded-xl active:bg-teal-500/10 shrink-0 flex items-center justify-center" title="按住拖移調整順序">
+<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+<path d="M7 4a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6-12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+</svg>
+</div>
+` : ''}
+
+<button onclick="togglePackingCheck('${item.id}')" class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 check-transition border ${
+item.checked
+? 'iridescent-active border-transparent scale-105'
+: 'bg-white/80 border-teal-300/80'
+}">
+${item.checked ? `
+<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path>
+</svg>
+` : ''}
+</button>
+
+<div class="flex-1 min-w-0">
+${appState.isUnlocked ? `
+<input type="text" value="${escapeHtml(item.name)}"
+onchange="updatePackingName('${item.id}', this.value)"
+class="w-full text-sm font-medium text-slate-800 px-2 py-1 rounded-lg border editable-highlight outline-none">
+` : `
+<div onclick="handleLockedTap()" class="text-sm font-medium truncate ${item.checked ? 'line-through text-slate-400' : 'text-slate-800'}">
+${escapeHtml(item.name)}
+</div>
+`}
+</div>
+
+${appState.isUnlocked ? `
+<button onclick="togglePackingCarryOn('${item.id}')" class="px-2 py-1 rounded-full text-[11px] font-semibold shrink-0 border transition-all active:scale-90 ${
+item.carryOn
+? 'bg-sky-500 text-white border-sky-400 shadow-sm'
+: 'bg-white/65 text-slate-400 border-white/80'
+}">
+隨身
+</button>
+` : (item.carryOn ? `
+<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100/90 text-sky-700 border border-sky-200/80 shrink-0">
+隨身
+</span>
+` : '')}
+
+${appState.isUnlocked ? (
+item.showQty ? `
+<div class="flex items-center gap-1 bg-white/80 rounded-full px-1.5 py-0.5 border border-white shrink-0">
+<button onclick="changePackingQty('${item.id}', -1)" class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center active:scale-90">−</button>
+<span class="text-xs font-bold text-slate-700 min-w-[16px] text-center">${item.qty}</span>
+<button onclick="changePackingQty('${item.id}', 1)" class="w-6 h-6 rounded-full bg-teal-500/15 text-teal-700 font-bold text-xs flex items-center justify-center active:scale-90">+</button>
+</div>
+` : `
+<button onclick="enablePackingQty('${item.id}')" class="px-2 py-1 rounded-full bg-white/70 text-[11px] font-semibold text-teal-700 border border-white shrink-0 active:scale-90">
++數量
+</button>
+`
+) : (
+item.showQty ? `
+<span class="px-2 py-0.5 rounded-full bg-white/75 text-xs font-bold text-teal-800 border border-white shrink-0">
+×${item.qty}
+</span>
+` : ''
+)}
+
+${appState.isUnlocked ? `
+<button onclick="deletePackingItem('${item.id}')" class="w-7 h-7 rounded-full bg-rose-100/80 text-rose-500 flex items-center justify-center shrink-0 active:scale-90">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+</svg>
+</button>
+` : ''}
+</div>
+`).join('');
+updateStickyMiniBar();
+}
+
+function addPackingItem() {
+const input = document.getElementById('new-item-input');
+const catSelect = document.getElementById('new-item-category');
+const name = input.value.trim();
+if (!name) return;
+
+appState.packingItems.unshift({
+id: 'p_' + Date.now(),
+name: name,
+category: catSelect.value,
+qty: 1,
+showQty: false,
+carryOn: appState.newItemCarryOn,
+checked: false
+});
+
+input.value = '';
+if (appState.newItemCarryOn) {
+toggleNewItemCarryOn();
+}
+if (appState.currentFilter !== 'carryon' && appState.currentCategory !== '全部' && appState.currentCategory !== catSelect.value) {
+appState.currentCategory = '全部';
+}
+saveState();
+renderCategoryPills();
+renderPackingList();
+showToast('已新增攜帶物品');
+}
+
+function togglePackingCheck(id) {
+const item = appState.packingItems.find(i => i.id === id);
+if (item) {
+item.checked = !item.checked;
+saveState();
+renderPackingList();
+}
+}
+
+function togglePackingCarryOn(id) {
+if (!appState.isUnlocked) return;
+const item = appState.packingItems.find(i => i.id === id);
+if (item) {
+item.carryOn = !item.carryOn;
+saveState();
+renderCategoryPills();
+renderPackingList();
+}
+}
+
+function enablePackingQty(id) {
+if (!appState.isUnlocked) return;
+const item = appState.packingItems.find(i => i.id === id);
+if (item) {
+item.showQty = true;
+item.qty = 1;
+saveState();
+renderPackingList();
+}
+}
+
+function changePackingQty(id, delta) {
+if (!appState.isUnlocked) return;
+const item = appState.packingItems.find(i => i.id === id);
+if (item) {
+const next = (item.qty || 1) + delta;
+if (next <= 0) {
+item.qty = 1;
+item.showQty = false;
+} else {
+item.qty = next;
+}
+saveState();
+renderPackingList();
+}
+}
+
+function updatePackingName(id, newName) {
+const trimmed = newName.trim();
+if (!trimmed) return;
+const item = appState.packingItems.find(i => i.id === id);
+if (item) {
+item.name = trimmed;
+saveState();
+}
+}
+
+function deletePackingItem(id) {
+appState.packingItems = appState.packingItems.filter(i => i.id !== id);
+saveState();
+renderCategoryPills();
+renderPackingList();
+}
+
+// ==========================================
+// 7. 待買清單邏輯 (已購買/未購買 + 全部/吃的/用的/其他 + 伴手禮/現場吃圓形圖示 + 地點多選膠囊)
+// ==========================================
+const SOUVENIR_ICON_SVG = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"></path></svg>`;
+const ONSITE_ICON_SVG = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3v6a3 3 0 003 3v9M5 3v5a2 2 0 002 2M9 3v5a2 2 0 01-2 2m10-7v18m0-18c1.657 0 3 1.79 3 4v4h-3"></path></svg>`;
+
+let hideLocationTimer = null;
+let hideSearchLocationTimer = null;
+
+function getUniqueExistingLocations() {
+const seen = new Set();
+const result = [];
+appState.shoppingItems.forEach(item => {
+const raw = (item.location || item.note || '').trim();
+if (!raw) return;
+raw.split('、').forEach(part => {
+const clean = part.trim();
+if (clean && !seen.has(clean)) {
+seen.add(clean);
+result.push(clean);
+}
+});
+});
+return result;
+}
+
+function showLocationSuggestions() {
+clearTimeout(hideLocationTimer);
+renderLocationSuggestions();
+}
+
+function hideLocationSuggestionsDelayed() {
+hideLocationTimer = setTimeout(() => {
+const box = document.getElementById('location-suggestions-box');
+if (box) {
+box.classList.add('hidden');
+box.classList.remove('flex');
+}
+}, 180);
+}
+
+function renderLocationSuggestions() {
+const box = document.getElementById('location-suggestions-box');
+const input = document.getElementById('new-shop-location');
+if (!box || !input) return;
+
+const allLocations = getUniqueExistingLocations();
+if (allLocations.length === 0) {
+box.classList.add('hidden');
+box.classList.remove('flex');
+return;
+}
+
+const rawVal = input.value;
+const parts = rawVal.split('、');
+const selectedSet = new Set(parts.slice(0, -1).map(s => s.trim()).filter(Boolean));
+const lastSegment = parts[parts.length - 1].trim();
+
+if (allLocations.includes(lastSegment)) {
+selectedSet.add(lastSegment);
+}
+
+const keyword = allLocations.includes(lastSegment) ? '' : lastSegment.toLowerCase();
+const filtered = keyword
+? allLocations.filter(loc => selectedSet.has(loc) || loc.toLowerCase().includes(keyword))
+: allLocations;
+
+if (filtered.length === 0) {
+box.classList.add('hidden');
+box.classList.remove('flex');
+return;
+}
+
+box.classList.remove('hidden');
+box.classList.add('flex');
+box.innerHTML = filtered.map(loc => {
+const isSelected = selectedSet.has(loc);
+return `
+<button type="button" onmousedown="event.preventDefault(); toggleLocationSuggestion('${escapeHtml(loc)}')"
+class="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 flex items-center gap-1 ${
+isSelected
+? 'bg-teal-600 text-white border border-teal-400 shadow-sm'
+: 'bg-white/85 text-teal-800 border border-teal-200/80 hover:bg-teal-50'
+}">
+<span>${escapeHtml(loc)}</span>
+${isSelected ? `<span class="text-[10px] leading-none opacity-90">✕</span>` : ''}
+</button>
+`;
+}).join('');
+}
+
+function toggleLocationSuggestion(loc) {
+clearTimeout(hideLocationTimer);
+const input = document.getElementById('new-shop-location');
+if (!input) return;
+
+const allLocations = getUniqueExistingLocations();
+const parts = input.value.split('、').map(s => s.trim()).filter(Boolean);
+
+if (parts.includes(loc)) {
+const next = parts.filter(p => p !== loc);
+input.value = next.join('、');
+} else {
+if (parts.length > 0 && !allLocations.includes(parts[parts.length - 1])) {
+parts[parts.length - 1] = loc;
+} else {
+parts.push(loc);
+}
+input.value = parts.join('、');
+}
+
+input.focus();
+renderLocationSuggestions();
+}
+
+function showSearchLocationSuggestions() {
+clearTimeout(hideSearchLocationTimer);
+renderSearchLocationSuggestions();
+}
+
+function hideSearchLocationSuggestionsDelayed() {
+hideSearchLocationTimer = setTimeout(() => {
+const box = document.getElementById('search-location-suggestions-box');
+if (box) {
+box.classList.add('hidden');
+box.classList.remove('flex');
+}
+}, 180);
+}
+
+function renderSearchLocationSuggestions() {
+const box = document.getElementById('search-location-suggestions-box');
+if (!box) return;
+
+const allLocations = getUniqueExistingLocations();
+if (allLocations.length === 0) {
+box.classList.add('hidden');
+box.classList.remove('flex');
+return;
+}
+
+const keyword = appState.shopLocationQuery.trim().toLowerCase();
+const filtered = keyword
+? allLocations.filter(loc => loc.toLowerCase().includes(keyword))
+: allLocations;
+
+if (filtered.length === 0) {
+box.classList.add('hidden');
+box.classList.remove('flex');
+return;
+}
+
+box.classList.remove('hidden');
+box.classList.add('flex');
+box.innerHTML = filtered.map(loc => {
+const isActive = appState.shopLocationQuery.trim() === loc;
+return `
+<button type="button" onmousedown="event.preventDefault(); selectSearchLocation('${escapeHtml(loc)}')"
+class="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${
+isActive
+? 'bg-teal-600 text-white border border-teal-400 shadow-sm'
+: 'bg-white/85 text-teal-800 border border-teal-200/80 hover:bg-teal-50'
+}">
+${escapeHtml(loc)}
+</button>
+`;
+}).join('');
+}
+
+function selectSearchLocation(loc) {
+clearTimeout(hideSearchLocationTimer);
+const input = document.getElementById('shop-location-search');
+if (!input) return;
+
+if (appState.shopLocationQuery.trim() === loc) {
+clearShopLocationSearch();
+return;
+}
+
+input.value = loc;
+onShopLocationSearchInput(loc);
+renderSearchLocationSuggestions();
+}
+
+function onShopLocationSearchInput(val) {
+appState.shopLocationQuery = val;
+const clearBtn = document.getElementById('clear-search-location-btn');
+if (clearBtn) {
+if (val.trim().length > 0) {
+clearBtn.classList.remove('hidden');
+clearBtn.classList.add('flex');
+} else {
+clearBtn.classList.add('hidden');
+clearBtn.classList.remove('flex');
+}
+}
+renderSearchLocationSuggestions();
+renderShoppingList();
+}
+
+function clearShopLocationSearch() {
+const input = document.getElementById('shop-location-search');
+if (input) input.value = '';
+appState.shopLocationQuery = '';
+const clearBtn = document.getElementById('clear-search-location-btn');
+if (clearBtn) {
+clearBtn.classList.add('hidden');
+clearBtn.classList.remove('flex');
+}
+renderSearchLocationSuggestions();
+renderShoppingList();
+}
+
+function onNewShopCategoryChange() {
+const cat = document.getElementById('new-shop-category').value;
+const group = document.getElementById('new-shop-foodtag-group');
+if (cat === '吃的') {
+group.classList.remove('hidden');
+group.classList.add('flex');
+} else {
+group.classList.add('hidden');
+group.classList.remove('flex');
+appState.newShopFoodTag = null;
+updateNewFoodTagUI();
+}
+}
+
+function toggleNewFoodTag(tag) {
+appState.newShopFoodTag = appState.newShopFoodTag === tag ? null : tag;
+updateNewFoodTagUI();
+}
+
+function updateNewFoodTagUI() {
+const btnSouvenir = document.getElementById('new-tag-souvenir');
+const btnOnsite = document.getElementById('new-tag-onsite');
+if (!btnSouvenir || !btnOnsite) return;
+
+btnSouvenir.className = appState.newShopFoodTag === 'souvenir'
+? 'w-8 h-8 rounded-full bg-amber-500 text-white border border-amber-400 flex items-center justify-center active:scale-95 transition-all shadow-sm'
+: 'w-8 h-8 rounded-full bg-white/70 text-slate-400 border border-white/80 flex items-center justify-center active:scale-95 transition-all';
+
+btnOnsite.className = appState.newShopFoodTag === 'onsite'
+? 'w-8 h-8 rounded-full bg-teal-600 text-white border border-teal-400 flex items-center justify-center active:scale-95 transition-all shadow-sm'
+: 'w-8 h-8 rounded-full bg-white/70 text-slate-400 border border-white/80 flex items-center justify-center active:scale-95 transition-all';
+}
+
+function setShopCategory(cat) {
+appState.currentShopCategory = cat;
+renderShoppingCategoryPills();
+renderShoppingList();
+}
+
+function setShopStatus(status) {
+appState.currentShopStatus = status;
+renderShoppingCategoryPills();
+renderShoppingList();
+}
+
+function renderShoppingCategoryPills() {
+const container = document.getElementById('shopping-category-pills');
+const total = appState.shoppingItems.length;
+const boughtCount = appState.shoppingItems.filter(i => i.bought).length;
+const unboughtCount = total - boughtCount;
+
+const statusOptions = [
+{ key: 'all', label: '全部狀態', count: total },
+{ key: 'unbought', label: '未購買', count: unboughtCount },
+{ key: 'bought', label: '已購買', count: boughtCount }
+];
+
+const statusRowHtml = `
+<div class="grid grid-cols-3 gap-2">
+${statusOptions.map(opt => {
+const active = appState.currentShopStatus === opt.key;
+return `
+<button onclick="setShopStatus('${opt.key}')" class="py-1.5 rounded-full text-xs font-semibold text-center transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+active
+? 'bg-teal-600 text-white shadow-sm border border-teal-400'
+: 'glass-pill text-slate-600 hover:bg-white/80'
+}">
+<span>${opt.label}</span>
+<span class="px-1.5 py-0.2 rounded-full text-[10px] ${active ? 'bg-white/25 text-white' : 'bg-teal-100/80 text-teal-800'}">${opt.count}</span>
+</button>
+`;
+}).join('')}
+</div>
+`;
+
+const categoryRowHtml = `
+<div class="grid grid-cols-4 gap-2">
+${SHOPPING_CATEGORIES.map(cat => {
+const active = appState.currentShopCategory === cat;
+return `
+<button onclick="setShopCategory('${cat}')" class="py-2 rounded-full text-xs font-semibold text-center transition-all active:scale-95 ${
+active
+? 'iridescent-active shadow-md'
+: 'glass-pill text-slate-600 hover:bg-white/80'
+}">
+${cat}
+</button>
+`;
+}).join('')}
+</div>
+`;
+
+container.innerHTML = statusRowHtml + categoryRowHtml;
+}
+
+function renderShoppingList() {
+const container = document.getElementById('shopping-list-container');
+const total = appState.shoppingItems.length;
+const boughtCount = appState.shoppingItems.filter(i => i.bought).length;
+document.getElementById('shopping-summary').textContent = `${boughtCount} / ${total} 已購`;
+
+const filtered = appState.shoppingItems.filter(item => {
+if (appState.currentShopStatus === 'bought' && !item.bought) return false;
+if (appState.currentShopStatus === 'unbought' && item.bought) return false;
+if (appState.currentShopCategory !== '全部' && (item.category || '其他') !== appState.currentShopCategory) return false;
+if (appState.shopLocationQuery.trim() !== '') {
+const locText = (item.location || item.note || '').toLowerCase();
+if (!locText.includes(appState.shopLocationQuery.trim().toLowerCase())) return false;
+}
+return true;
+});
+
+if (filtered.length === 0) {
+container.innerHTML = `
+<div class="glass-card rounded-3xl py-8 text-center text-sm text-slate-400">
+此篩選條件下目前沒有待買項目
+</div>
+`;
+updateStickyMiniBar();
+return;
+}
+
+container.innerHTML = filtered.map(item => `
+<div data-id="${item.id}" class="sortable-item glass-card rounded-2xl p-3 flex items-center gap-2 ${item.bought ? 'opacity-60 bg-white/40' : ''}">
+${appState.isUnlocked ? `
+<div onpointerdown="startItemDrag(event, '${item.id}', 'shopping')" class="drag-handle text-teal-600/80 hover:text-teal-700 py-2 px-1.5 -ml-1 rounded-xl active:bg-teal-500/10 shrink-0 flex items-center justify-center" title="按住拖移調整順序">
+<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+<path d="M7 4a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6-12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+</svg>
+</div>
+` : ''}
+
+<button onclick="toggleShoppingBought('${item.id}')" class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 check-transition border ${
+item.bought
+? 'iridescent-active border-transparent'
+: 'bg-white/80 border-teal-300/80'
+}">
+${item.bought ? `
+<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path>
+</svg>
+` : ''}
+</button>
+
+<div class="flex-1 min-w-0">
+${appState.isUnlocked ? `
+<div class="space-y-1.5">
+<input type="text" value="${escapeHtml(item.name)}"
+onchange="updateShoppingName('${item.id}', this.value)"
+class="w-full text-sm font-medium text-slate-800 px-2 py-1 rounded-lg border editable-highlight outline-none">
+<input type="text" value="${escapeHtml(item.location ?? item.note ?? '')}" placeholder="購買地點 (如：海雲台、樂天超市)"
+onchange="updateShoppingLocation('${item.id}', this.value)"
+class="w-full text-[11px] text-slate-600 px-2 py-1 rounded-lg border border-sky-300/60 bg-white/80 outline-none">
+<input type="text" value="${escapeHtml(item.recommend || '')}" placeholder="推薦品項 / 口味"
+onchange="updateShoppingRecommend('${item.id}', this.value)"
+class="w-full text-[11px] text-slate-600 px-2 py-1 rounded-lg border border-teal-300/60 bg-white/80 outline-none">
+</div>
+` : `
+<div onclick="handleLockedTap()" class="text-sm font-medium ${item.bought ? 'line-through text-slate-400' : 'text-slate-800'}">
+${escapeHtml(item.name)}
+</div>
+${(item.location || item.note) ? `
+<div onclick="handleLockedTap()" class="flex items-start gap-1 text-[11px] text-sky-700/90 mt-1 leading-relaxed">
+<svg class="w-3.5 h-3.5 shrink-0 mt-0.5 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path>
+<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"></path>
+</svg>
+<span>${escapeHtml(item.location || item.note)}</span>
+</div>
+` : ''}
+${item.recommend ? `
+<div onclick="handleLockedTap()" class="flex items-start gap-1 text-[11px] text-teal-800/85 mt-0.5 leading-relaxed">
+<svg class="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"></path>
+</svg>
+<span>${escapeHtml(item.recommend)}</span>
+</div>
+` : ''}
+`}
+</div>
+
+<!-- 吃的分類：伴手禮 / 現場吃 圓形圖示標籤 -->
+${(item.category === '吃的') ? (
+appState.isUnlocked ? `
+<div class="flex items-center gap-1 shrink-0">
+<button onclick="toggleShoppingFoodTag('${item.id}', 'souvenir')" class="w-7 h-7 rounded-full flex items-center justify-center border transition-all active:scale-90 ${
+item.foodTag === 'souvenir'
+? 'bg-amber-500 text-white border-amber-400 shadow-sm'
+: 'bg-white/65 text-slate-400 border-white/80'
+}" title="伴手禮">
+${SOUVENIR_ICON_SVG}
+</button>
+<button onclick="toggleShoppingFoodTag('${item.id}', 'onsite')" class="w-7 h-7 rounded-full flex items-center justify-center border transition-all active:scale-90 ${
+item.foodTag === 'onsite'
+? 'bg-teal-600 text-white border-teal-400 shadow-sm'
+: 'bg-white/65 text-slate-400 border-white/80'
+}" title="現場吃">
+${ONSITE_ICON_SVG}
+</button>
+</div>
+` : (
+item.foodTag === 'souvenir' ? `
+<span class="w-7 h-7 rounded-full bg-amber-100/90 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0" title="伴手禮">
+${SOUVENIR_ICON_SVG}
+</span>
+` : item.foodTag === 'onsite' ? `
+<span class="w-7 h-7 rounded-full bg-teal-100/90 text-teal-700 border border-teal-200/80 flex items-center justify-center shrink-0" title="現場吃">
+${ONSITE_ICON_SVG}
+</span>
+` : ''
+)
+) : ''}
+
+<!-- 一鍵複製商品名稱按鈕 -->
+<button onclick="copyItemText('${item.id}')" class="w-7 h-7 rounded-full bg-white/75 text-teal-700 hover:bg-white border border-white flex items-center justify-center shrink-0 active:scale-90 transition-transform" title="複製商品名稱搜尋">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"></path>
+</svg>
+</button>
+
+${appState.isUnlocked ? `
+<button onclick="deleteShoppingItem('${item.id}')" class="w-7 h-7 rounded-full bg-rose-100/80 text-rose-500 flex items-center justify-center shrink-0 active:scale-90">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+</svg>
+</button>
+` : ''}
+</div>
+`).join('');
+updateStickyMiniBar();
+}
+
+function addShoppingItem() {
+const nameInput = document.getElementById('new-shop-input');
+const catSelect = document.getElementById('new-shop-category');
+const locationInput = document.getElementById('new-shop-location');
+const recommendInput = document.getElementById('new-shop-recommend');
+const name = nameInput.value.trim();
+const location = normalizeLocationNames(locationInput.value.trim());
+const recommend = recommendInput.value.trim();
+if (!name) return;
+
+const cat = catSelect.value;
+appState.shoppingItems.unshift({
+id: 's_' + Date.now(),
+name: name,
+category: cat,
+foodTag: cat === '吃的' ? appState.newShopFoodTag : null,
+location: location,
+recommend: recommend,
+bought: false
+});
+
+nameInput.value = '';
+locationInput.value = '';
+recommendInput.value = '';
+appState.newShopFoodTag = null;
+updateNewFoodTagUI();
+
+const locBox = document.getElementById('location-suggestions-box');
+if (locBox) {
+locBox.classList.add('hidden');
+locBox.classList.remove('flex');
+}
+
+if (appState.currentShopCategory !== '全部' && appState.currentShopCategory !== cat) {
+appState.currentShopCategory = '全部';
+}
+if (appState.currentShopStatus === 'bought') {
+appState.currentShopStatus = 'all';
+}
+saveState();
+renderShoppingCategoryPills();
+renderShoppingList();
+showToast('已加入待買清單');
+}
+
+function toggleShoppingBought(id) {
+const item = appState.shoppingItems.find(i => i.id === id);
+if (item) {
+item.bought = !item.bought;
+saveState();
+renderShoppingCategoryPills();
+renderShoppingList();
+}
+}
+
+function toggleShoppingFoodTag(id, tag) {
+if (!appState.isUnlocked) return;
+const item = appState.shoppingItems.find(i => i.id === id);
+if (item) {
+item.foodTag = item.foodTag === tag ? null : tag;
+saveState();
+renderShoppingList();
+}
+}
+
+function updateShoppingName(id, newName) {
+const trimmed = newName.trim();
+if (!trimmed) return;
+const item = appState.shoppingItems.find(i => i.id === id);
+if (item) {
+item.name = trimmed;
+saveState();
+}
+}
+
+function updateShoppingLocation(id, newLocation) {
+const item = appState.shoppingItems.find(i => i.id === id);
+if (item) {
+item.location = normalizeLocationNames(newLocation.trim());
+delete item.note;
+saveState();
+}
+}
+
+function updateShoppingRecommend(id, newRecommend) {
+const item = appState.shoppingItems.find(i => i.id === id);
+if (item) {
+item.recommend = newRecommend.trim();
+saveState();
+}
+}
+
+function copyItemText(id) {
+const item = appState.shoppingItems.find(i => i.id === id);
+if (!item) return;
+
+const tempInput = document.createElement('textarea');
+tempInput.value = item.name;
+tempInput.style.position = 'fixed';
+tempInput.style.opacity = '0';
+document.body.appendChild(tempInput);
+tempInput.select();
+tempInput.setSelectionRange(0, 99999);
+try {
+document.execCommand('copy');
+showToast(`已複製「${item.name}」`);
+} catch (err) {
+showToast('複製失敗，請手動選取');
+}
+document.body.removeChild(tempInput);
+}
+
+function deleteShoppingItem(id) {
+appState.shoppingItems = appState.shoppingItems.filter(i => i.id !== id);
+saveState();
+renderShoppingCategoryPills();
+renderShoppingList();
+renderSearchLocationSuggestions();
+}
+
+function openClearShoppingModal() {
+if (!appState.isUnlocked) return;
+if (appState.shoppingItems.length === 0) {
+showToast('待買清單已經是空的');
+return;
+}
+const modal = document.getElementById('clear-shopping-modal');
+modal.classList.remove('hidden');
+modal.classList.add('flex');
+}
+
+function closeClearShoppingModal() {
+const modal = document.getElementById('clear-shopping-modal');
+modal.classList.add('hidden');
+modal.classList.remove('flex');
+}
+
+function confirmClearShopping() {
+appState.shoppingItems = [];
+appState.shopLocationQuery = '';
+const searchInput = document.getElementById('shop-location-search');
+if (searchInput) searchInput.value = '';
+const clearSearchBtn = document.getElementById('clear-search-location-btn');
+if (clearSearchBtn) {
+clearSearchBtn.classList.add('hidden');
+clearSearchBtn.classList.remove('flex');
+}
+saveState();
+renderShoppingCategoryPills();
+renderShoppingList();
+renderSearchLocationSuggestions();
+closeClearShoppingModal();
+showToast('已清空所有待買清單');
+}
+
+// ==========================================
+// 8. 方案一：透明虛線佔位框 (Ghost Placeholder) ＋ 其他卡片平滑讓位
+// ==========================================
+let dragSession = null;
+
+function startItemDrag(e, itemId, listType) {
+if (!appState.isUnlocked) return;
+e.preventDefault();
+
+const containerId = listType === 'packing' ? 'packing-list-container' : 'shopping-list-container';
+const container = document.getElementById(containerId);
+const card = container ? container.querySelector(`[data-id="${itemId}"]`) : null;
+if (!card) return;
+
+const rect = card.getBoundingClientRect();
+
+// 建立與被拖曳卡片等高的透明虛線佔位框 (Ghost Placeholder)
+const placeholder = document.createElement('div');
+placeholder.className = 'drag-placeholder';
+placeholder.style.height = `${rect.height}px`;
+placeholder.style.width = `${rect.width}px`;
+
+// 在原本位置插入佔位框，並讓選中卡片脫離排版流、輕微放大浮起
+container.insertBefore(placeholder, card);
+card.classList.add('dragging-card');
+card.style.left = `${rect.left}px`;
+card.style.top = `${rect.top}px`;
+card.style.width = `${rect.width}px`;
+card.style.transform = 'scale(1.03)';
+
+dragSession = {
+itemId,
+listType,
+container,
+card,
+placeholder,
+offsetY: e.clientY - rect.top,
+lastPointerY: e.clientY,
+autoScrollRaf: null
+};
+
+updateStickyMiniBar();
+document.addEventListener('pointermove', handleItemDragMove);
+document.addEventListener('pointerup', handleItemDragEnd);
+document.addEventListener('pointercancel', handleItemDragEnd);
+
+dragSession.autoScrollRaf = requestAnimationFrame(autoScrollDuringDrag);
+}
+
+function handleItemDragMove(e) {
+if (!dragSession) return;
+const { card, offsetY } = dragSession;
+dragSession.lastPointerY = e.clientY;
+
+// 浮起卡片平滑跟隨手指垂直移動
+card.style.top = `${e.clientY - offsetY}px`;
+updatePlaceholderPosition();
+}
+
+function updatePlaceholderPosition() {
+if (!dragSession) return;
+const { container, card, placeholder } = dragSession;
+const cardRect = card.getBoundingClientRect();
+const cardCenterY = cardRect.top + cardRect.height / 2;
+
+const siblings = [...container.querySelectorAll('.sortable-item:not(.dragging-card)')];
+if (siblings.length === 0) return;
+
+// 記錄所有其他卡片移動前的位置 (FLIP 動畫 First 步驟)
+const beforeTops = new Map();
+siblings.forEach(el => {
+beforeTops.set(el, el.getBoundingClientRect().top);
+});
+
+let targetBefore = null;
+for (const sib of siblings) {
+const sibRect = sib.getBoundingClientRect();
+const sibMidY = sibRect.top + sibRect.height / 2;
+if (cardCenterY < sibMidY) {
+targetBefore = sib;
+break;
+}
+}
+
+const currentNext = placeholder.nextElementSibling;
+if (targetBefore !== currentNext) {
+if (targetBefore) {
+container.insertBefore(placeholder, targetBefore);
+} else {
+container.appendChild(placeholder);
+}
+
+// 讓位置改變的相鄰卡片平滑滑動讓位 (FLIP 動畫 Last -> Invert -> Play)
+siblings.forEach(el => {
+const oldTop = beforeTops.get(el);
+const newTop = el.getBoundingClientRect().top;
+const deltaY = oldTop - newTop;
+if (deltaY !== 0) {
+el.style.transition = 'none';
+el.style.transform = `translateY(${deltaY}px)`;
+el.getBoundingClientRect(); // 強制重排
+el.style.transition = 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)';
+el.style.transform = '';
+}
+});
+}
+}
+
+function autoScrollDuringDrag() {
+if (!dragSession) return;
+const { lastPointerY } = dragSession;
+const edgeZone = 75;
+const maxSpeed = 10;
+
+if (lastPointerY < edgeZone) {
+const ratio = (edgeZone - lastPointerY) / edgeZone;
+window.scrollBy(0, -Math.ceil(ratio * maxSpeed));
+updatePlaceholderPosition();
+} else if (lastPointerY > window.innerHeight - edgeZone) {
+const ratio = (lastPointerY - (window.innerHeight - edgeZone)) / edgeZone;
+window.scrollBy(0, Math.ceil(ratio * maxSpeed));
+updatePlaceholderPosition();
+}
+
+dragSession.autoScrollRaf = requestAnimationFrame(autoScrollDuringDrag);
+}
+
+function handleItemDragEnd() {
+if (!dragSession) return;
+const { listType, container, card, placeholder, autoScrollRaf } = dragSession;
+
+if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
+document.removeEventListener('pointermove', handleItemDragMove);
+document.removeEventListener('pointerup', handleItemDragEnd);
+document.removeEventListener('pointercancel', handleItemDragEnd);
+
+// 將浮起卡片精準放回虛線佔位框的位置並移除佔位框
+container.insertBefore(card, placeholder);
+placeholder.remove();
+
+card.classList.remove('dragging-card');
+card.style.left = '';
+card.style.top = '';
+card.style.width = '';
+card.style.transform = '';
+
+// 依據最終 DOM 順序同步更新資料陣列並儲存
+const orderedIds = [...container.querySelectorAll('.sortable-item')].map(el => el.getAttribute('data-id'));
+syncStateOrderByVisibleIds(listType, orderedIds);
+
+dragSession = null;
+updateStickyMiniBar();
+saveState();
+showToast('已更新排序');
+}
+
+function syncStateOrderByVisibleIds(listType, orderedVisibleIds) {
+const arr = listType === 'packing' ? appState.packingItems : appState.shoppingItems;
+const visibleSet = new Set(orderedVisibleIds);
+const itemMap = new Map(arr.map(item => [item.id, item]));
+
+let visibleCursor = 0;
+const nextArr = arr.map(item => {
+if (visibleSet.has(item.id)) {
+const nextId = orderedVisibleIds[visibleCursor++];
+return itemMap.get(nextId) || item;
+}
+return item;
+});
+
+if (listType === 'packing') {
+appState.packingItems = nextArr;
+} else {
+appState.shoppingItems = nextArr;
+}
+}
+
+// ==========================================
+// 9. 頂部精簡一鍵回頂部膠囊與工具函式
+// ==========================================
+function scrollToTopSmooth() {
+window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateStickyMiniBar() {
+const bar = document.getElementById('sticky-mini-bar');
+if (!bar) return;
+
+// 拖曳排序中自動隱藏避讓
+const shouldShow = window.scrollY > 135 && !dragSession;
+if (shouldShow) {
+bar.classList.remove('-translate-y-4', 'opacity-0', 'pointer-events-none');
+bar.classList.add('translate-y-0', 'opacity-100', 'pointer-events-auto');
+} else {
+bar.classList.add('-translate-y-4', 'opacity-0', 'pointer-events-none');
+bar.classList.remove('translate-y-0', 'opacity-100', 'pointer-events-auto');
+}
+}
+
+let toastTimer = null;
+function showToast(msg) {
+const toast = document.getElementById('toast');
+const toastMsg = document.getElementById('toast-msg');
+toastMsg.textContent = msg;
+toast.classList.remove('opacity-0');
+toast.classList.add('opacity-100');
+
+clearTimeout(toastTimer);
+toastTimer = setTimeout(() => {
+toast.classList.remove('opacity-100');
+toast.classList.add('opacity-0');
+}, 2200);
+}
+
+function escapeHtml(str) {
+return String(str)
+.replace(/&/g, '&amp;')
+.replace(/</g, '&lt;')
+.replace(/>/g, '&gt;')
+.replace(/"/g, '&quot;');
+}
+
+window.addEventListener('scroll', updateStickyMiniBar, { passive: true });
+
+window.addEventListener('DOMContentLoaded', () => {
+loadState();
+document.title = `${appState.tripTitle} • 旅遊小助手`;
+renderTripHeader();
+updateLockUI();
+renderCurrencyUI();
+renderCategoryPills();
+renderPackingList();
+renderShoppingCategoryPills();
+renderShoppingList();
+updateStickyMiniBar();
+initOfflineSupport();
+});
+
+// ==========================================
+// 10. 無網路 (離線) 快取與本機儲存持久化保護
+// ==========================================
+function updateNetworkStatusUI(notifyUser = false) {
+const badge = document.getElementById('offline-badge');
+const isOnline = navigator.onLine;
+
+if (badge) {
+badge.className = isOnline
+? 'w-2 h-2 rounded-full bg-emerald-500 shrink-0'
+: 'w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0';
+badge.title = isOnline ? '已連線 • 離線快取就緒' : '無網路離線模式 • 資料安全儲存於本機';
+}
+if (notifyUser) {
+showToast(isOnline ? '已恢復網路連線' : '目前為無網路模式，仍可正常使用並自動儲存於本機');
+}
+}
+
+function initOfflineSupport() {
+// 申請瀏覽器持久化儲存權限，避免系統在空間不足時自動清除本機清單
+if (navigator.storage && navigator.storage.persist) {
+navigator.storage.persist().catch(() => {});
+}
+
+// 動態註冊 Service Worker 快取整個網頁與外部資源，實現完全斷網重開可用
+if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
+const swCode = `
+const CACHE_NAME = 'travel-helper-offline-v1';
+self.addEventListener('install', (event) => {
+self.skipWaiting();
+event.waitUntil(
+caches.open(CACHE_NAME).then((cache) => {
+return cache.addAll([self.location.href, 'https://cdn.tailwindcss.com']).catch(() => {});
+})
+);
+});
+self.addEventListener('activate', (event) => {
+event.waitUntil(self.clients.claim());
+});
+self.addEventListener('fetch', (event) => {
+if (event.request.method !== 'GET') return;
+event.respondWith(
+caches.match(event.request).then((cached) => {
+const fetchPromise = fetch(event.request).then((networkResponse) => {
+if (networkResponse && networkResponse.status === 200) {
+const copy = networkResponse.clone();
+caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+}
+return networkResponse;
+}).catch(() => cached);
+return cached || fetchPromise;
+})
+);
+});
+`;
+try {
+const blob = new Blob([swCode], { type: 'application/javascript' });
+const swUrl = URL.createObjectURL(blob);
+navigator.serviceWorker.register(swUrl).catch(() => {});
+} catch (e) {}
+}
+
+window.addEventListener('online', () => updateNetworkStatusUI(true));
+window.addEventListener('offline', () => updateNetworkStatusUI(true));
+window.addEventListener('beforeunload', () => saveState());
+document.addEventListener('visibilitychange', () => {
+if (document.visibilityState === 'hidden') saveState();
+});
+updateNetworkStatusUI(false);
+}
+</script>
+</body>
+</html>
